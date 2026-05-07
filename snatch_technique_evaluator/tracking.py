@@ -125,10 +125,7 @@ class BarbellTracker:
         x2 = min(frame_bgr.shape[1], int(prev_x + search_radius))
         y2 = min(frame_bgr.shape[0], int(prev_y + search_radius))
         search = frame_bgr[y1:y2, x1:x2]
-        if (
-            search.shape[0] < self.template.shape[0]
-            or search.shape[1] < self.template.shape[1]
-        ):
+        if search.shape[0] < self.template.shape[0] or search.shape[1] < self.template.shape[1]:
             return None, 0.0
 
         result = cv2.matchTemplate(search, self.template, cv2.TM_CCOEFF_NORMED)
@@ -156,4 +153,3 @@ class BarbellTracker:
     def _point_in_bounds(frame_bgr: np.ndarray, point: tuple[float, float]) -> bool:
         x, y = point
         return 0 <= x < frame_bgr.shape[1] and 0 <= y < frame_bgr.shape[0]
-

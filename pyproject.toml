@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = []
+dev = ["ruff>=0.15"]
 
 [project.scripts]
 snatch-technique-evaluator = "snatch_technique_evaluator.app:main"
@@ -31,3 +31,14 @@ include = ["snatch_technique_evaluator*"]
 
 [tool.setuptools.package-data]
 snatch_technique_evaluator = ["references/*.json"]
+
+[tool.ruff]
+line-length = 120
+
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

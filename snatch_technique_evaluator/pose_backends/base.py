@@ -34,4 +34,3 @@ class PoseBackend(ABC):
 
     def close(self) -> None:
         return None
-

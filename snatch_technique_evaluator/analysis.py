@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 
 from .pose_backends import PoseBackend, PoseResult, YoloPoseBackend
-from .tracking import BarTrackState, BarbellTracker
+from .tracking import BarbellTracker, BarTrackState
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_VERSION = "1.0"
@@ -31,7 +31,15 @@ SKELETON_EDGES = [
     ("right_hip", "right_knee"),
     ("right_knee", "right_ankle"),
 ]
-PHASES = ["setup", "first_pull", "second_pull", "turnover", "catch", "recovery", "finish"]
+PHASES = [
+    "setup",
+    "first_pull",
+    "second_pull",
+    "turnover",
+    "catch",
+    "recovery",
+    "finish",
+]
 SCORE_LABELS = {
     "bar_path": "Bar Path",
     "torso_hip": "Torso And Hip",
@@ -221,7 +229,9 @@ def make_output_dir(video_path: Path, output_root: Path | None = None) -> Path:
     return output_dir
 
 
-def open_annotated_video_writer(output_path: Path, fps: float, width: int, height: int) -> tuple[cv2.VideoWriter, str, Path]:
+def open_annotated_video_writer(
+    output_path: Path, fps: float, width: int, height: int
+) -> tuple[cv2.VideoWriter, str, Path]:
     # Try MP4-friendly codecs first.  mp4v is the most broadly-available
     # codec that does not depend on external libraries such as openh264.
     for codec in ("mp4v", "avc1"):
@@ -251,8 +261,7 @@ def open_annotated_video_writer(output_path: Path, fps: float, width: int, heigh
         writer.release()
 
     raise RuntimeError(
-        f"Unable to open annotated video writer for {output_path} "
-        f"(or {avi_path}) with codecs: mp4v, avc1, XVID, MJPG"
+        f"Unable to open annotated video writer for {output_path} (or {avi_path}) with codecs: mp4v, avc1, XVID, MJPG"
     )
 
 
@@ -355,8 +364,13 @@ def request_point_click(
                 r = max(6, int(round(8 * scale)))
                 cv2.circle(frame, point, r, accent_color, thickness, cv2.LINE_AA)
                 cv2.drawMarker(
-                    frame, point, accent_color, cv2.MARKER_CROSS,
-                    max(14, int(round(18 * scale))), thickness, cv2.LINE_AA
+                    frame,
+                    point,
+                    accent_color,
+                    cv2.MARKER_CROSS,
+                    max(14, int(round(18 * scale))),
+                    thickness,
+                    cv2.LINE_AA,
                 )
 
             cv2.imshow(window_name, frame)
@@ -411,6 +425,7 @@ def create_pose_backend(backend_name: str, model_name: str, device: str) -> tupl
         except Exception:
             if device.startswith("cuda"):
                 import warnings
+
                 warnings.warn(
                     f"CUDA failed for device '{device}', falling back to CPU.",
                     RuntimeWarning,
@@ -523,8 +538,14 @@ def detect_phases(records: list[FrameRecord]) -> PhaseMarkers:
     if not records:
         return PhaseMarkers(0, 0, 0, 0, 0, 0, 0)
 
-    bar_y = np.array([record.bar_y if record.bar_y is not None else np.nan for record in records], dtype=np.float32)
-    hip_y = np.array([record.hip_mid_y if record.hip_mid_y is not None else np.nan for record in records], dtype=np.float32)
+    bar_y = np.array(
+        [record.bar_y if record.bar_y is not None else np.nan for record in records],
+        dtype=np.float32,
+    )
+    hip_y = np.array(
+        [record.hip_mid_y if record.hip_mid_y is not None else np.nan for record in records],
+        dtype=np.float32,
+    )
     extension = np.array(
         [record.extension_score if record.extension_score is not None else np.nan for record in records],
         dtype=np.float32,
@@ -545,9 +566,7 @@ def detect_phases(records: list[FrameRecord]) -> PhaseMarkers:
         first_pull_start = 0
 
     second_pull_start = _first_sustained(
-        (upward_velocity > velocity_threshold)
-        | (extension > extension_threshold)
-        | (acceleration > accel_threshold),
+        (upward_velocity > velocity_threshold) | (extension > extension_threshold) | (acceleration > accel_threshold),
         start=first_pull_start + 1,
         length=2,
     )
@@ -601,7 +620,9 @@ def build_warnings(records: list[FrameRecord], phases: PhaseMarkers) -> list[str
                 warnings.append("Hips rising too early in the first pull.")
 
     post_second_pull = records[phases.second_pull_start : phases.catch_frame + 1]
-    offsets = [abs(record.bar_horizontal_offset) for record in post_second_pull if record.bar_horizontal_offset is not None]
+    offsets = [
+        abs(record.bar_horizontal_offset) for record in post_second_pull if record.bar_horizontal_offset is not None
+    ]
     if offsets and max(offsets) > THRESHOLDS["bar_far_from_body_px"]:
         warnings.append("Bar loops away from the body after the second pull.")
 
@@ -613,7 +634,11 @@ def build_warnings(records: list[FrameRecord], phases: PhaseMarkers) -> list[str
         and catch_record.ankle_mid_x is not None
     ):
         body_line_x = np.mean(
-            [catch_record.shoulder_mid_x, catch_record.hip_mid_x, catch_record.ankle_mid_x]
+            [
+                catch_record.shoulder_mid_x,
+                catch_record.hip_mid_x,
+                catch_record.ankle_mid_x,
+            ]
         )
         if abs(catch_record.bar_x - body_line_x) > THRESHOLDS["overhead_alignment_px"]:
             warnings.append("Overhead bar alignment is unstable at the catch.")
@@ -697,7 +722,10 @@ def _chart_transform(
 
     base_x = float(path_points[0][0])
     base_y = float(path_points[0][1])
-    series = np.array([(point[0] - base_x, base_y - point[1]) for point in path_points], dtype=np.float32)
+    series = np.array(
+        [(point[0] - base_x, base_y - point[1]) for point in path_points],
+        dtype=np.float32,
+    )
     xs = _smooth_curve(series[:, 0])
     ys = _smooth_curve(series[:, 1])
     smooth_points = _densify_points(list(zip(xs.tolist(), ys.tolist())))
@@ -747,7 +775,10 @@ def _draw_info_overlay(
         cv2.putText(
             frame_bgr,
             text,
-            (12 + padding_x, 12 + padding_y + (row + 1) * line_height - int(line_height * 0.28)),
+            (
+                12 + padding_x,
+                12 + padding_y + (row + 1) * line_height - int(line_height * 0.28),
+            ),
             cv2.FONT_HERSHEY_SIMPLEX,
             font_scale,
             color,
@@ -772,7 +803,14 @@ def _draw_bar_path_chart(
     overlay = canvas.copy()
     cv2.rectangle(overlay, (chart_left, chart_top), (chart_right, chart_bottom), (18, 23, 29), -1)
     cv2.addWeighted(overlay, 0.72, canvas, 0.28, 0.0, canvas)
-    cv2.rectangle(canvas, (chart_left, chart_top), (chart_right, chart_bottom), (86, 96, 108), 1, cv2.LINE_AA)
+    cv2.rectangle(
+        canvas,
+        (chart_left, chart_top),
+        (chart_right, chart_bottom),
+        (86, 96, 108),
+        1,
+        cv2.LINE_AA,
+    )
 
     # No text / titles — plot fills nearly the whole box
     plot_left = chart_left + 10
@@ -791,8 +829,24 @@ def _draw_bar_path_chart(
     transformed = _chart_transform(path_points, plot_left, plot_top, plot_right, plot_bottom)
     if transformed is not None:
         projected, y_axis_x, x_axis_y = transformed
-        _dash_line(canvas, (plot_left, x_axis_y), (plot_right, x_axis_y), (122, 130, 138), 2, dash=14, gap=8)
-        _dash_line(canvas, (y_axis_x, plot_top), (y_axis_x, plot_bottom), (122, 130, 138), 2, dash=14, gap=8)
+        _dash_line(
+            canvas,
+            (plot_left, x_axis_y),
+            (plot_right, x_axis_y),
+            (122, 130, 138),
+            2,
+            dash=14,
+            gap=8,
+        )
+        _dash_line(
+            canvas,
+            (y_axis_x, plot_top),
+            (y_axis_x, plot_bottom),
+            (122, 130, 138),
+            2,
+            dash=14,
+            gap=8,
+        )
 
         cv2.polylines(
             canvas,
@@ -818,10 +872,7 @@ def _draw_bar_path_on_frame(
     if len(path_points) < 2:
         return
 
-    scaled = [
-        (int(round(x * scale_x)), int(round(y * scale_y)))
-        for x, y in path_points
-    ]
+    scaled = [(int(round(x * scale_x)), int(round(y * scale_y))) for x, y in path_points]
     pts = np.array(scaled, dtype=np.int32).reshape((-1, 1, 2))
     thickness = max(3, int(round(3 * render_scale)))
     glow = max(8, int(round(8 * render_scale)))
@@ -833,11 +884,21 @@ def _draw_bar_path_on_frame(
 
     # Start dot
     cv2.circle(
-        canvas, scaled[0], max(6, int(round(6 * render_scale))), (0, 255, 0), -1, cv2.LINE_AA
+        canvas,
+        scaled[0],
+        max(6, int(round(6 * render_scale))),
+        (0, 255, 0),
+        -1,
+        cv2.LINE_AA,
     )
     # Current position dot
     cv2.circle(
-        canvas, scaled[-1], max(8, int(round(8 * render_scale))), (0, 0, 255), -1, cv2.LINE_AA
+        canvas,
+        scaled[-1],
+        max(8, int(round(8 * render_scale))),
+        (0, 0, 255),
+        -1,
+        cv2.LINE_AA,
     )
 
     # Vertical dashed reference line at the starting x-position
@@ -877,7 +938,14 @@ def _draw_bar_path_on_frame(
                 cv2.rectangle(overlay, (x1, y1), (x2, y2), (18, 18, 18), -1)
                 cv2.addWeighted(overlay, 0.72, canvas, 0.28, 0, canvas)
                 cv2.putText(
-                    canvas, label, (x1 + 5, y2 - 3), font, fs, (235, 235, 235), thick, cv2.LINE_AA
+                    canvas,
+                    label,
+                    (x1 + 5, y2 - 3),
+                    font,
+                    fs,
+                    (235, 235, 235),
+                    thick,
+                    cv2.LINE_AA,
                 )
 
 
@@ -1127,18 +1195,23 @@ class LiftStateMachine:
             if overhead and self._hip_rising_from_catch(record):
                 self.state = "recovery"
         elif self.state == "recovery":
-            if overhead and abs(bar_velocity) <= THRESHOLDS["completion_bar_velocity_px"] and abs(hip_velocity) <= THRESHOLDS["completion_hip_velocity_px"]:
+            if (
+                overhead
+                and abs(bar_velocity) <= THRESHOLDS["completion_bar_velocity_px"]
+                and abs(hip_velocity) <= THRESHOLDS["completion_hip_velocity_px"]
+            ):
                 self.completion.stable_frames += 1
             else:
                 self.completion.stable_frames = 0
 
-            if (
-                self.completion.completion_frame is None
-                and self.completion.stable_frames >= int(THRESHOLDS["completion_stable_frames"])
+            if self.completion.completion_frame is None and self.completion.stable_frames >= int(
+                THRESHOLDS["completion_stable_frames"]
             ):
                 self.state = "complete"
                 self.completion.completion_frame = record.frame_index
-                self.completion.completion_reason = "catch detected, recovered to standing, and stable overhead support confirmed"
+                self.completion.completion_reason = (
+                    "catch detected, recovered to standing, and stable overhead support confirmed"
+                )
         record.live_state = self.state
         return self.completion
 
@@ -1195,13 +1268,17 @@ def finalize_record_features(records: list[FrameRecord], phases: PhaseMarkers) -
                 record.overhead_alignment_norm = float((record.bar_x - record.shoulder_mid_x) / record.body_scale_px)
         if record.torso_angle_deg is not None:
             record.torso_angle_norm = record.torso_angle_deg / 90.0
-        knee_values = [value for value in (record.left_knee_angle_deg, record.right_knee_angle_deg) if value is not None]
+        knee_values = [
+            value for value in (record.left_knee_angle_deg, record.right_knee_angle_deg) if value is not None
+        ]
         if knee_values:
             record.knee_angle_mean_deg = float(sum(knee_values) / len(knee_values))
         hip_values = [value for value in (record.left_hip_angle_deg, record.right_hip_angle_deg) if value is not None]
         if hip_values:
             record.hip_angle_mean_deg = float(sum(hip_values) / len(hip_values))
-        elbow_values = [value for value in (record.left_elbow_angle_deg, record.right_elbow_angle_deg) if value is not None]
+        elbow_values = [
+            value for value in (record.left_elbow_angle_deg, record.right_elbow_angle_deg) if value is not None
+        ]
         if elbow_values:
             record.elbow_angle_mean_deg = float(sum(elbow_values) / len(elbow_values))
 
@@ -1228,16 +1305,17 @@ def load_reference_profile(reference_path: Path | None) -> dict[str, Any] | None
     profile = json.loads(reference_path.read_text(encoding="utf-8"))
     schema_version = profile.get("schema_version")
     if schema_version != SCHEMA_VERSION:
-        raise RuntimeError(
-            f"Reference profile schema mismatch. Expected {SCHEMA_VERSION}, found {schema_version}."
-        )
+        raise RuntimeError(f"Reference profile schema mismatch. Expected {SCHEMA_VERSION}, found {schema_version}.")
     return profile
 
 
 def interpolate_series(values: list[float | None], sample_count: int) -> list[float | None]:
     if sample_count <= 0:
         return []
-    numeric = np.array([np.nan if value is None else float(value) for value in values], dtype=np.float32)
+    numeric = np.array(
+        [np.nan if value is None else float(value) for value in values],
+        dtype=np.float32,
+    )
     mask = ~np.isnan(numeric)
     if not mask.any():
         return [None] * sample_count
@@ -1285,10 +1363,14 @@ def build_normalized_lift(records: list[FrameRecord], phases: PhaseMarkers) -> d
     recovery_hip_velocity = []
     for previous, current in zip(recovery_records, recovery_records[1:]):
         recovery_bar_velocity.append(
-            abs((previous.bar_y or 0.0) - (current.bar_y or 0.0)) if previous.bar_y is not None and current.bar_y is not None else None
+            abs((previous.bar_y or 0.0) - (current.bar_y or 0.0))
+            if previous.bar_y is not None and current.bar_y is not None
+            else None
         )
         recovery_hip_velocity.append(
-            abs((previous.hip_mid_y or 0.0) - (current.hip_mid_y or 0.0)) if previous.hip_mid_y is not None and current.hip_mid_y is not None else None
+            abs((previous.hip_mid_y or 0.0) - (current.hip_mid_y or 0.0))
+            if previous.hip_mid_y is not None and current.hip_mid_y is not None
+            else None
         )
 
     return {
@@ -1387,9 +1469,7 @@ def aggregate_curve(curves: list[list[float | None]], reducer) -> list[float | N
     result: list[float | None] = []
     for sample_index in range(REFERENCE_SAMPLE_COUNT):
         values = [
-            curve[sample_index]
-            for curve in curves
-            if sample_index < len(curve) and curve[sample_index] is not None
+            curve[sample_index] for curve in curves if sample_index < len(curve) and curve[sample_index] is not None
         ]
         result.append(float(reducer(values)) if values else None)
     return result
@@ -1420,15 +1500,34 @@ def compute_reference_deviations(
     reference_video_count = int(reference_profile.get("reference_video_count") or 0)
     if reference_video_count < 3:
         scoring_notes.append(
-            f"Reference profile contains {reference_video_count} accepted video(s); feature tolerance floors were used to avoid over-penalizing normal pose and phase jitter."
+            f"Reference profile contains {reference_video_count} accepted video(s); "
+            "feature tolerance floors were used to avoid over-penalizing normal pose and phase jitter."
         )
 
     group_feature_map = {
-        "bar_path": [("first_pull", "bar_path_x_norm"), ("second_pull", "bar_path_y_norm"), ("turnover", "bar_path_x_norm")],
-        "torso_hip": [("first_pull", "torso_angle_norm"), ("first_pull", "hip_height_norm")],
-        "turnover_catch": [("turnover", "elbow_angle_mean_deg"), ("catch", "hip_height_norm"), ("catch", "overhead_alignment_norm")],
-        "overhead_recovery": [("catch", "overhead_alignment_norm"), ("recovery", "overhead_alignment_norm"), ("recovery", "bar_path_y_norm")],
-        "symmetry_footwork": [("catch", "left_right_knee_angle_diff_deg"), ("recovery", "foot_displacement_norm")],
+        "bar_path": [
+            ("first_pull", "bar_path_x_norm"),
+            ("second_pull", "bar_path_y_norm"),
+            ("turnover", "bar_path_x_norm"),
+        ],
+        "torso_hip": [
+            ("first_pull", "torso_angle_norm"),
+            ("first_pull", "hip_height_norm"),
+        ],
+        "turnover_catch": [
+            ("turnover", "elbow_angle_mean_deg"),
+            ("catch", "hip_height_norm"),
+            ("catch", "overhead_alignment_norm"),
+        ],
+        "overhead_recovery": [
+            ("catch", "overhead_alignment_norm"),
+            ("recovery", "overhead_alignment_norm"),
+            ("recovery", "bar_path_y_norm"),
+        ],
+        "symmetry_footwork": [
+            ("catch", "left_right_knee_angle_diff_deg"),
+            ("recovery", "foot_displacement_norm"),
+        ],
     }
 
     per_group_deviation: dict[str, list[float]] = {key: [] for key in group_feature_map}
@@ -1538,11 +1637,11 @@ def deviation_to_finding(deviation: dict[str, Any]) -> str:
     if feature == "hip_height_norm":
         return f"Catch or recovery depth was outside the reference range during {phase}."
     if feature == "torso_angle_norm":
-        return f"Torso angle in the first pull differed from the reference pattern."
+        return "Torso angle in the first pull differed from the reference pattern."
     if feature == "overhead_alignment_norm":
         return f"Overhead bar alignment was less stable than the reference during {phase}."
     if feature == "elbow_angle_mean_deg":
-        return f"Turnover elbow timing lagged the reference pattern."
+        return "Turnover elbow timing lagged the reference pattern."
     if feature in {"foot_displacement_norm", "foot_displacement_px"}:
         return f"Foot displacement exceeded the reference range during {phase}."
     return f"{feature} deviated from the reference during {phase}."
@@ -1563,7 +1662,12 @@ def apply_per_frame_reference_deviation(
             REFERENCE_SAMPLE_COUNT - 1,
             int(round(record.normalized_phase_progress * (REFERENCE_SAMPLE_COUNT - 1))),
         )
-        feature_names = ["bar_path_x_norm", "bar_path_y_norm", "hip_height_norm", "overhead_alignment_norm"]
+        feature_names = [
+            "bar_path_x_norm",
+            "bar_path_y_norm",
+            "hip_height_norm",
+            "overhead_alignment_norm",
+        ]
         deviations = []
         for feature_name in feature_names:
             reference, reference_feature_name = reference_feature_curve(reference_profile, record.phase, feature_name)
@@ -1575,7 +1679,9 @@ def apply_per_frame_reference_deviation(
             if observed is None or reference_mean is None:
                 continue
             tolerance_floor = FEATURE_TOLERANCE_FLOORS.get(reference_feature_name, 0.05)
-            deviations.append(abs(float(observed) - float(reference_mean)) / max(float(reference_std or 0.0), tolerance_floor))
+            deviations.append(
+                abs(float(observed) - float(reference_mean)) / max(float(reference_std or 0.0), tolerance_floor)
+            )
         if deviations:
             record.reference_deviation = float(sum(deviations) / len(deviations))
 
@@ -1586,9 +1692,7 @@ class SnatchAnalysisSession:
         self.video_path = config.video_path
         self.output_dir = config.output_dir or make_output_dir(config.video_path)
         self.device = resolve_device(config.device)
-        self.pose_backend, actual_device = create_pose_backend(
-            config.pose_backend_name, config.model_name, self.device
-        )
+        self.pose_backend, actual_device = create_pose_backend(config.pose_backend_name, config.model_name, self.device)
         self.device = actual_device
         self.reference_profile = load_reference_profile(config.reference_path)
         self.window_name = "Snatch Detector V1"
@@ -1624,9 +1728,7 @@ class SnatchAnalysisSession:
             capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
             if self.config.show_live_window:
                 cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-                cv2.setWindowProperty(
-                    self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN
-                )
+                cv2.setWindowProperty(self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
             frame_index = 0
             paused = False
@@ -1865,7 +1967,14 @@ class SnatchAnalysisSession:
         left_elbow_angle = angle_at_joint(left_shoulder, left_elbow, left_wrist)
         right_elbow_angle = angle_at_joint(right_shoulder, right_elbow, right_wrist)
         extension_components = [
-            value for value in [left_knee_angle, right_knee_angle, left_hip_angle, right_hip_angle] if value is not None
+            value
+            for value in [
+                left_knee_angle,
+                right_knee_angle,
+                left_hip_angle,
+                right_hip_angle,
+            ]
+            if value is not None
         ]
         extension_score = float(sum(extension_components) / len(extension_components)) if extension_components else None
 
@@ -1967,7 +2076,10 @@ class SnatchAnalysisSession:
                     path_phases.append(record.phase)
 
                 completion_text = None
-                if artifacts.completion.completion_frame is not None and frame_index >= artifacts.completion.completion_frame:
+                if (
+                    artifacts.completion.completion_frame is not None
+                    and frame_index >= artifacts.completion.completion_frame
+                ):
                     completion_text = "Snatch complete"
                 vis = annotate_frame(
                     frame_bgr=frame,
@@ -2074,7 +2186,13 @@ def discover_reference_videos(paths: list[Path]) -> list[Path]:
 def validate_reference_candidate(artifacts: AnalysisArtifacts) -> list[str]:
     issues: list[str] = []
     phase_frames = asdict(artifacts.phases)
-    required = ["first_pull_start", "second_pull_start", "catch_frame", "recovery_start", "finish_frame"]
+    required = [
+        "first_pull_start",
+        "second_pull_start",
+        "catch_frame",
+        "recovery_start",
+        "finish_frame",
+    ]
     for key in required:
         if phase_frames[key] is None:
             issues.append(f"missing {key}")
@@ -2095,7 +2213,10 @@ def build_reference_profile(
     reference_output_path.parent.mkdir(parents=True, exist_ok=True)
     successful_videos: list[dict[str, Any]] = []
     excluded_videos: list[dict[str, Any]] = []
-    build_output_dir = make_output_dir(reference_output_path.with_suffix(""), output_root=reference_output_path.parent.parent / "outputs")
+    build_output_dir = make_output_dir(
+        reference_output_path.with_suffix(""),
+        output_root=reference_output_path.parent.parent / "outputs",
+    )
 
     for video_path in videos:
         session = SnatchAnalysisSession(

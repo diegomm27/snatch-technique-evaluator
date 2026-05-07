@@ -119,8 +119,14 @@ class OpenPoseBackend(PoseBackend):
                 path / "pose_iter_440000.caffemodel",
                 path / "pose_iter_584000.caffemodel",
             ]
-            proto_path = next((candidate for candidate in proto_candidates if candidate.exists()), None)
-            weights_path = next((candidate for candidate in weight_candidates if candidate.exists()), None)
+            proto_path = next(
+                (candidate for candidate in proto_candidates if candidate.exists()),
+                None,
+            )
+            weights_path = next(
+                (candidate for candidate in weight_candidates if candidate.exists()),
+                None,
+            )
             if proto_path and weights_path:
                 return OpenPoseBackend._validate_paths(proto_path, weights_path)
 

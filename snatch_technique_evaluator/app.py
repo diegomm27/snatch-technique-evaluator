@@ -173,13 +173,38 @@ class SnatchLauncher:
                 pass
         style.configure("App.TFrame", background="#f6f7f9")
         style.configure("Card.TFrame", background="#ffffff", relief="flat")
-        style.configure("Title.TLabel", background="#f6f7f9", foreground="#171b22", font=("Segoe UI Semibold", 24))
-        style.configure("Body.TLabel", background="#f6f7f9", foreground="#4a5565", font=("Segoe UI", 10))
-        style.configure("CardTitle.TLabel", background="#ffffff", foreground="#171b22", font=("Segoe UI Semibold", 13))
-        style.configure("CardBody.TLabel", background="#ffffff", foreground="#4a5565", font=("Segoe UI", 10))
+        style.configure(
+            "Title.TLabel",
+            background="#f6f7f9",
+            foreground="#171b22",
+            font=("Segoe UI Semibold", 24),
+        )
+        style.configure(
+            "Body.TLabel",
+            background="#f6f7f9",
+            foreground="#4a5565",
+            font=("Segoe UI", 10),
+        )
+        style.configure(
+            "CardTitle.TLabel",
+            background="#ffffff",
+            foreground="#171b22",
+            font=("Segoe UI Semibold", 13),
+        )
+        style.configure(
+            "CardBody.TLabel",
+            background="#ffffff",
+            foreground="#4a5565",
+            font=("Segoe UI", 10),
+        )
         style.configure("Accent.TButton", font=("Segoe UI Semibold", 10), padding=(10, 8))
         style.configure("Secondary.TButton", font=("Segoe UI", 10))
-        style.configure("Switch.TCheckbutton", background="#ffffff", foreground="#171b22", font=("Segoe UI", 10))
+        style.configure(
+            "Switch.TCheckbutton",
+            background="#ffffff",
+            foreground="#171b22",
+            font=("Segoe UI", 10),
+        )
 
     def _build_layout(self) -> None:
         root = self.root
@@ -192,7 +217,10 @@ class SnatchLauncher:
         self.ttk.Label(header, text="Snatch Bar Path", style="Title.TLabel").grid(row=0, column=0, sticky="w")
         self.ttk.Label(
             header,
-            text="Choose a side-view lift video, click the barbell once, and generate the tracked bar path with annotated outputs.",
+            text=(
+                "Choose a side-view lift video, click the barbell once, and generate the "
+                "tracked bar path with annotated outputs."
+            ),
             style="Body.TLabel",
             wraplength=760,
             justify="left",
@@ -211,7 +239,10 @@ class SnatchLauncher:
         self.ttk.Label(analyze_card, text="Track Lift", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
         self.ttk.Label(
             analyze_card,
-            text="Pick a side-view snatch video. The app will ask for one initial barbell click, then track the bar and generate the path overlay.",
+            text=(
+                "Pick a side-view snatch video. The app will ask for one initial barbell "
+                "click, then track the bar and generate the path overlay."
+            ),
             style="CardBody.TLabel",
             wraplength=470,
             justify="left",
@@ -397,8 +428,8 @@ class SnatchLauncher:
         video_name = summary.get("annotated_video_filename") or "annotated.mp4"
         report_lines = [
             f"Annotated video: {video_name}",
-            f"Frame data: frames.csv",
-            f"Metrics: metrics.json",
+            "Frame data: frames.csv",
+            "Metrics: metrics.json",
         ]
         findings = summary.get("warnings", [])
         if findings:

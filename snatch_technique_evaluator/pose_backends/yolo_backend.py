@@ -61,11 +61,15 @@ class YoloPoseBackend(PoseBackend):
         candidates: list[_Candidate] = []
         for index, points in enumerate(keypoint_array):
             bbox_xyxy = (
-                float(boxes[index][0]),
-                float(boxes[index][1]),
-                float(boxes[index][2]),
-                float(boxes[index][3]),
-            ) if boxes is not None else (0.0, 0.0, 0.0, 0.0)
+                (
+                    float(boxes[index][0]),
+                    float(boxes[index][1]),
+                    float(boxes[index][2]),
+                    float(boxes[index][3]),
+                )
+                if boxes is not None
+                else (0.0, 0.0, 0.0, 0.0)
+            )
             visible = {
                 name: (
                     float(points[kp_index][0]),
@@ -110,4 +114,3 @@ class YoloPoseBackend(PoseBackend):
             pose_confidence=selected.score,
             visible_area=selected.visible_area,
         )
-
