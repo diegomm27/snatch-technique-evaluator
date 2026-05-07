@@ -148,6 +148,8 @@ The bar-path graph in the video is:
 - **Zoomed in** on realistic bar displacement ranges
 - **Clean** — no titles, labels, or footers, just the path, grid, and axis guides
 
+> **annotated - Trim:** I tried my best xD
+
 ---
 
 ## Project structure
