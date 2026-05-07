@@ -26,7 +26,6 @@ yolo11*.pt
 
 # Outputs and reference videos
 outputs/
-*.mp4
 references/*.mp4
 references/*.mov
 references/*.avi
