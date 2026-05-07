@@ -2,6 +2,10 @@
 
 A Python toolkit for analyzing Olympic weightlifting snatch technique from side-view videos. It uses **YOLO pose estimation** to track the lifter's body and **optical-flow barbell tracking** to generate an annotated video with a real-time bar-path graph.
 
+![Demo](output%20example.gif)
+
+> I tried my best xD
+
 ---
 
 ## What it does
@@ -147,8 +151,6 @@ The bar-path graph in the video is:
 - **Fixed to the right edge** (does not follow the lifter)
 - **Zoomed in** on realistic bar displacement ranges
 - **Clean** — no titles, labels, or footers, just the path, grid, and axis guides
-
-> **annotated - Trim:** I tried my best xD
 
 ---
 
