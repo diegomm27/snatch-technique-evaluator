@@ -160,8 +160,7 @@ snatch_technique_evaluator/
 ├── tracking.py           # BarbellTracker (optical flow / template matching)
 └── pose_backends/
     ├── base.py           # PoseBackend abstract base + PoseResult
-    ├── yolo_backend.py   # Ultralytics YOLO wrapper
-    └── openpose_backend.py # (deprecated — kept for reference only)
+    └── yolo_backend.py   # Ultralytics YOLO wrapper
 ```
 
 ---
@@ -179,7 +178,6 @@ snatch_technique_evaluator/
 
 - The analyzer expects a **side-view** snatch video for accurate bar-path and angle measurements.
 - An initial barbell click is required to seed the tracker.
-- The pose backend is hardcoded to **YOLO**; OpenPose support has been removed.
 - Auto-pause and device selection are automatic — no manual configuration needed.
 
 ## License
