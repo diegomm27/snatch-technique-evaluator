@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snatch-technique-evaluator"
+version = "0.1.0"
+description = "Side-view Olympic snatch video analysis and scoring toolkit."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Diego" }]
+dependencies = [
+    "numpy>=1.26",
+    "opencv-python>=4.10",
+    "ttkbootstrap>=1.10",
+    "ultralytics>=8.3",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[project.scripts]
+snatch-technique-evaluator = "snatch_technique_evaluator.app:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["snatch_technique_evaluator*"]
+
+[tool.setuptools.package-data]
+snatch_technique_evaluator = ["references/*.json"]
