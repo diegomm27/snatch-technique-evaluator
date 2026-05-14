@@ -109,10 +109,12 @@ class AnalysisConfiguration:
         try:
             import ttkbootstrap as ttk
             self._has_ttkb = True
+            self.ttk = ttk
         except ImportError:
             import tkinter as tk
             from tkinter import ttk as _ttk
             self._has_ttkb = False
+            self.ttk = _ttk
 
         try:
             import tkinter as tk
@@ -333,10 +335,10 @@ class AnalysisConfiguration:
             variable=self.tk.StringVar(value=self.selected_preset),
             value=name,
             command=lambda n=name: self._select_preset(n),
-            bg=card.cget("bg") if hasattr(card, 'cget') else "#ffffff",
+            bg="#ffffff",
             fg=COLOR_PRIMARY_600 if is_selected else COLOR_TEXT_PRIMARY_LIGHT,
             font=("Segoe UI Semibold", 13),
-            selectcolor=card.cget("bg") if hasattr(card, 'cget') else "#eee",
+            selectcolor="#ffffff",
         )
         # For ttkb, we need a different approach
         if self._has_ttkb:
@@ -570,6 +572,12 @@ class AnalysisConfiguration:
             "Save Preset",
             f"Preset '{self.selected_preset}' configuration saved.",
         )
+
+    def _on_back(self) -> None:
+        if self.on_back:
+            self.on_back()
+        else:
+            self.root.destroy()
 
     def _run_analysis(self) -> None:
         if self.on_run_analysis:

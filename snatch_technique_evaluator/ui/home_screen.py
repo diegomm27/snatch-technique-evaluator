@@ -31,6 +31,8 @@ class RecentAnalysis:
 
     @property
     def score_color(self) -> str:
+        if self.score is None:
+            return COLOR_ERROR
         if self.score >= 85:
             return COLOR_SUCCESS
         if self.score >= 70:
@@ -56,10 +58,12 @@ class HomeScreen:
         try:
             import ttkbootstrap as ttk
             self._has_ttkb = True
+            self.ttk = ttk
         except ImportError:
             import tkinter as tk
             from tkinter import ttk as _ttk
             self._has_ttkb = False
+            self.ttk = _ttk
 
         try:
             import tkinter as tk
@@ -302,12 +306,13 @@ class HomeScreen:
         """Create a single recent analysis card widget."""
         card = self.ttk.Frame(parent, style="RecentCard.TFrame", padding=(16, 14))
         card.columnconfigure(0, weight=1)
+        score_value = analysis.score if analysis.score is not None else 0
 
         # Score badge at top
         score_color = analysis.score_color
         self.ttk.Label(
             card,
-            text=f"{analysis.score:.0f}/100",
+            text=f"{score_value:.0f}/100",
             style="RecentScore.TLabel",
         ).grid(row=0, column=0, sticky="e")
 
@@ -333,7 +338,7 @@ class HomeScreen:
 
         bar = self.tk.Canvas(bar_frame, width=200, height=6, bg=COLOR_BORDER_LIGHT, highlightthickness=0)
         bar.grid(row=0, column=0, sticky="ew")
-        fill_width = (analysis.score / 100) * 200
+        fill_width = (score_value / 100) * 200
         bar.create_rectangle(0, 0, fill_width, 6, fill=score_color, outline="")
 
         # Clickable - bind to open analysis
@@ -346,7 +351,9 @@ class HomeScreen:
         if not self.recent_analyses:
             return ["0", "—", "—", "0"]
 
-        scores = [a.score for a in self.recent_analyses]
+        scores = [a.score for a in self.recent_analyses if a.score is not None]
+        if not scores:
+            return [str(len(self.recent_analyses)), "â€”", "â€”", "0"]
         avg_score = sum(scores) / len(scores)
         best_score = max(scores)
         return [

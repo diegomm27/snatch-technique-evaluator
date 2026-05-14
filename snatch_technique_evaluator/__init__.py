@@ -6,9 +6,6 @@ from typing import Any
 __all__ = [
     "AnalyzerConfig",
     "SnatchAnalysisSession",
-    "build_reference_profile",
-    "default_reference_path",
-    "discover_reference_videos",
 ]
 
 

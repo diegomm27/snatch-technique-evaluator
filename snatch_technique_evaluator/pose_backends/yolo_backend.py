@@ -28,7 +28,7 @@ class YoloPoseBackend(PoseBackend):
         except ImportError as exc:
             raise RuntimeError(
                 "ultralytics is not installed. Run "
-                r"'.\.venv-gpu\Scripts\python.exe -m pip install ultralytics'."
+                r"'python -m pip install ultralytics'."
             ) from exc
 
         self.model = YOLO(model_name)

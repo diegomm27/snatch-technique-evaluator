@@ -70,10 +70,12 @@ class ComparisonView:
         try:
             import ttkbootstrap as ttk
             self._has_ttkb = True
+            self.ttk = ttk
         except ImportError:
             import tkinter as tk
             from tkinter import ttk as _ttk
             self._has_ttkb = False
+            self.ttk = _ttk
 
         try:
             import tkinter as tk
@@ -313,10 +315,10 @@ class ComparisonView:
         # Table header
         header_frame = self.ttk.Frame(table_panel, style="CompareTable.TFrame", padding=(12, 8))
         header_frame.grid(row=1, column=0, sticky="ew")
-        header_frame.columnconfigure(0, width=200)
+        header_frame.columnconfigure(0, minsize=200)
         header_frame.columnconfigure(1, weight=1)
         header_frame.columnconfigure(2, weight=1)
-        header_frame.columnconfigure(3, width=80)
+        header_frame.columnconfigure(3, minsize=80)
 
         self.ttk.Label(
             header_frame, text="Metric", style="MetricName.TLabel"
@@ -349,10 +351,10 @@ class ComparisonView:
         for i, (name, va, vb, delta) in enumerate(comparison_metrics):
             row_frame = self.ttk.Frame(table_panel, style="CompareTable.TFrame", padding=(8, 4))
             row_frame.grid(row=2 + i, column=0, sticky="ew")
-            row_frame.columnconfigure(0, width=200)
+            row_frame.columnconfigure(0, minsize=200)
             row_frame.columnconfigure(1, weight=1)
             row_frame.columnconfigure(2, weight=1)
-            row_frame.columnconfigure(3, width=80)
+            row_frame.columnconfigure(3, minsize=80)
 
             self.ttk.Label(
                 row_frame, text=name, style="MetricName.TLabel"

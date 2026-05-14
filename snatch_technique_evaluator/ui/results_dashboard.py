@@ -109,10 +109,12 @@ class ResultsDashboard:
         try:
             import ttkbootstrap as ttk
             self._has_ttkb = True
+            self.ttk = ttk
         except ImportError:
             import tkinter as tk
             from tkinter import ttk as _ttk
             self._has_ttkb = False
+            self.ttk = _ttk
 
         try:
             import tkinter as tk
