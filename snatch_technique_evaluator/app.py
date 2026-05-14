@@ -29,8 +29,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     analyze_parser = subparsers.add_parser("analyze", help="Track the bar path in a snatch attempt.")
     launch_parser = subparsers.add_parser("launch", help="Open the desktop launcher UI.")
+    dashboard_parser = subparsers.add_parser("dashboard", help="Open the home dashboard UI.")
 
-    for target in (parser, analyze_parser):
+    for target in (parser, analyze_parser, launch_parser, dashboard_parser):
         _add_common_analysis_args(target)
 
     launch_parser.add_argument(
@@ -48,6 +49,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--device",
         default=_preferred_device(),
         help="Torch device, for example auto, cpu, cuda, or cuda:0.",
+    )
+    launch_parser.add_argument(
+        "--theme",
+        default="light",
+        choices=["light", "dark"],
+        help="UI theme.",
     )
 
     args = parser.parse_args(argv)
@@ -131,7 +138,16 @@ def _model_for_backend(model_text: str) -> str:
 
 
 class SnatchLauncher:
-    def __init__(self, model: str) -> None:
+    """Main launcher with full UI integration.
+
+    Screens:
+    1. Home Dashboard - recent analyses, quick stats, quick actions
+    2. Analysis Configuration - presets, parameters, advanced settings
+    3. Results Dashboard - 3-zone layout (video + metrics + actions)
+    4. Comparison View - side-by-side video comparison
+    """
+
+    def __init__(self, model: str, theme: str = "light") -> None:
         try:
             import tkinter as tk
             from tkinter import filedialog, messagebox
@@ -147,16 +163,17 @@ class SnatchLauncher:
         self.filedialog = filedialog
         self.messagebox = messagebox
         self.model_default = model
+        self.theme_name = theme
         self.worker: threading.Thread | None = None
         self.events: queue.Queue[tuple[str, Any]] = queue.Queue()
 
         if hasattr(ttk, "Window"):
-            self.root = ttk.Window(themename="flatly")
+            self.root = ttk.Window(themename="flatly" if theme == "light" else "darkly")
         else:
             self.root = tk.Tk()
-        self.root.title("Snatch Bar Path")
-        self.root.geometry("900x560")
-        self.root.minsize(780, 520)
+        self.root.title("Weight Lifting Analyzer")
+        self.root.geometry("1300x850")
+        self.root.minsize(1200, 800)
         self.root.configure(bg="#f6f7f9")
         self._build_styles()
         self._build_layout()
@@ -197,7 +214,11 @@ class SnatchLauncher:
             foreground="#4a5565",
             font=("Segoe UI", 10),
         )
-        style.configure("Accent.TButton", font=("Segoe UI Semibold", 10), padding=(10, 8))
+        style.configure(
+            "Accent.TButton",
+            font=("Segoe UI Semibold", 10),
+            padding=(10, 8),
+        )
         style.configure("Secondary.TButton", font=("Segoe UI", 10))
         style.configure(
             "Switch.TCheckbutton",
@@ -211,83 +232,91 @@ class SnatchLauncher:
         root.columnconfigure(0, weight=1)
         root.rowconfigure(1, weight=1)
 
+        # Header
         header = self.ttk.Frame(root, style="App.TFrame", padding=(26, 22, 26, 10))
         header.grid(row=0, column=0, sticky="ew")
         header.columnconfigure(0, weight=1)
-        self.ttk.Label(header, text="Snatch Bar Path", style="Title.TLabel").grid(row=0, column=0, sticky="w")
+        self.ttk.Label(header, text="Weight Lifting Analyzer", style="Title.TLabel").grid(
+            row=0, column=0, sticky="w"
+        )
         self.ttk.Label(
             header,
-            text=(
-                "Choose a side-view lift video, click the barbell once, and generate the "
-                "tracked bar path with annotated outputs."
-            ),
+            text="Desktop application for analyzing weightlifting snatch technique using pose estimation",
             style="Body.TLabel",
-            wraplength=760,
+            wraplength=800,
             justify="left",
         ).grid(row=1, column=0, sticky="w", pady=(8, 0))
 
+        # Content
         content = self.ttk.Frame(root, style="App.TFrame", padding=(26, 8, 26, 18))
         content.grid(row=1, column=0, sticky="nsew")
         content.columnconfigure(0, weight=1)
-        content.rowconfigure(1, weight=1)
+        content.rowconfigure(0, weight=1)
 
-        analyze_card = self.ttk.Frame(content, style="Card.TFrame", padding=18)
-        analyze_card.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=(0, 0))
-        analyze_card.columnconfigure(0, weight=1)
-        analyze_card.columnconfigure(1, weight=0)
-
-        self.ttk.Label(analyze_card, text="Track Lift", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
-        self.ttk.Label(
-            analyze_card,
-            text=(
-                "Pick a side-view snatch video. The app will ask for one initial barbell "
-                "click, then track the bar and generate the path overlay."
-            ),
-            style="CardBody.TLabel",
-            wraplength=470,
-            justify="left",
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 16))
-
-        self.video_var = self.tk.StringVar()
-        video_entry = self.ttk.Entry(analyze_card, textvariable=self.video_var, font=("Segoe UI", 10))
-        video_entry.grid(row=2, column=0, sticky="ew", padx=(0, 10))
-        self.ttk.Button(
-            analyze_card,
-            text="Browse Video",
-            style="Secondary.TButton",
-            command=self._browse_video,
-        ).grid(row=2, column=1, sticky="ew")
-
-        self.model_var = self.tk.StringVar(value=self.model_default)
-
-        model_row = self.ttk.Frame(analyze_card, style="Card.TFrame")
-        model_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(18, 0))
-        model_row.columnconfigure(1, weight=1)
-        self.ttk.Label(model_row, text="Model", style="CardBody.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.ttk.Combobox(
-            model_row,
-            textvariable=self.model_var,
-            values=["yolo11n-pose.pt", "yolo11x-pose.pt"],
-            state="readonly",
-            font=("Segoe UI", 10),
-        ).grid(row=0, column=1, sticky="ew")
-        self.ttk.Label(
-            model_row,
-            text="yolo11n-pose.pt = fast / lower accuracy   |   yolo11x-pose.pt = slower / best accuracy",
-            font=("Segoe UI", 8),
-            foreground="#8899aa",
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        # Quick actions row
+        actions_frame = self.ttk.Frame(content, style="App.TFrame")
+        actions_frame.grid(row=0, column=0, sticky="nsew")
+        actions_frame.columnconfigure(tuple(range(4)), weight=1)
 
         self.ttk.Button(
-            analyze_card,
-            text="Track Bar Path",
+            actions_frame,
+            text="+ New Analysis",
             style="Accent.TButton",
-            command=self._start_analyze,
-        ).grid(row=4, column=0, columnspan=2, sticky="ew", pady=(18, 0))
+            command=self._open_home_screen,
+        ).grid(row=0, column=0, padx=(0, 8), sticky="ew")
 
+        self.ttk.Button(
+            actions_frame,
+            text="Analysis Config",
+            style="Secondary.TButton",
+            command=self._open_analysis_config,
+        ).grid(row=0, column=1, padx=(0, 8), sticky="ew")
+
+        self.ttk.Button(
+            actions_frame,
+            text="Compare",
+            style="Secondary.TButton",
+            command=self._open_comparison,
+        ).grid(row=0, column=2, padx=(0, 8), sticky="ew")
+
+        self.ttk.Button(
+            actions_frame,
+            text="Settings",
+            style="Secondary.TButton",
+            command=self._open_settings,
+        ).grid(row=0, column=3, sticky="ew")
+
+        # Info card
+        info_card = self.ttk.Frame(content, style="Card.TFrame", padding=(20, 16))
+        info_card.grid(row=1, column=0, sticky="nsew", pady=(16, 0))
+        info_card.columnconfigure(0, weight=1)
+
+        self.ttk.Label(
+            info_card,
+            text="Getting Started",
+            style="CardTitle.TLabel",
+        ).grid(row=0, column=0, sticky="w")
+
+        steps = [
+            "1. Click '+ New Analysis' to select a video and run the full analysis pipeline.",
+            "2. Click 'Analysis Config' to configure presets, parameters, and advanced settings.",
+            "3. Click 'Compare' to view side-by-side comparison of two snatch attempts.",
+            "4. After analysis, the Results Dashboard shows the 3-zone layout: video playback "
+            "with pose overlay, phase-by-phase metrics, and export actions.",
+        ]
+        step_text = "\n\n".join(steps)
+        self.ttk.Label(
+            info_card,
+            text=step_text,
+            style="CardBody.TLabel",
+            wraplength=700,
+            justify="left",
+        ).grid(row=1, column=0, sticky="w", pady=(8, 0))
+
+        # Log area
         self.log_text = self.tk.Text(
             content,
-            height=12,
+            height=8,
             bg="#211915",
             fg="#f7efe2",
             insertbackground="#f7efe2",
@@ -295,7 +324,7 @@ class SnatchLauncher:
             font=("Consolas", 10),
             wrap="word",
         )
-        self.log_text.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
+        self.log_text.grid(row=2, column=0, sticky="nsew", pady=(12, 0))
         self.log_text.insert("1.0", "Launcher ready.\n")
         self.log_text.configure(state="disabled")
 
@@ -305,41 +334,147 @@ class SnatchLauncher:
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 
-    def _browse_video(self) -> None:
-        selected = self.filedialog.askopenfilename(
-            title="Select a side-view snatch video",
-            filetypes=[
-                ("Video files", "*.mp4 *.mov *.avi *.mkv"),
-                ("MP4", "*.mp4"),
-                ("MOV", "*.mov"),
-                ("AVI", "*.avi"),
-                ("MKV", "*.mkv"),
-            ],
-        )
-        if selected:
-            self.video_var.set(selected)
+    def _open_home_screen(self) -> None:
+        """Open the home dashboard screen."""
+        try:
+            from .ui.home_screen import HomeScreen
+        except ImportError as exc:
+            self.messagebox.showerror("Import Error", f"Failed to import HomeScreen: {exc}")
+            return
 
-    def _start_analyze(self) -> None:
-        video_text = self.video_var.get().strip()
-        if not video_text:
+        def on_new_analysis() -> None:
+            self._open_analysis_config()
+
+        def on_comparison() -> None:
+            self._open_comparison()
+
+        def on_settings() -> None:
+            self.messagebox.showinfo("Settings", "Settings panel coming soon.")
+
+        self._append_log("Opening Home Dashboard...")
+        home = HomeScreen(
+            on_new_analysis=on_new_analysis,
+            on_comparison=on_comparison,
+            on_settings=on_settings,
+            theme=self.theme_name,
+        )
+        home.run()
+
+    def _open_analysis_config(self) -> None:
+        """Open the analysis configuration screen."""
+        try:
+            from .ui.analysis_config import AnalysisConfiguration
+        except ImportError as exc:
+            self.messagebox.showerror("Import Error", f"Failed to import AnalysisConfiguration: {exc}")
+            return
+
+        def on_run_analysis(**kwargs: Any) -> None:
+            self._append_log(f"Running analysis with preset: {kwargs.get('preset', 'unknown')}")
+            self._run_analysis(
+                video_path=None,
+                pose_model=kwargs.get("pose_model", "yolo11n-pose.pt"),
+                sensitivity=kwargs.get("sensitivity", 0.7),
+                auto_pause=kwargs.get("auto_pause", True),
+                reference=kwargs.get("reference", "default_reference.json"),
+                output_format=kwargs.get("output_format", "pdf"),
+                device=kwargs.get("device", "auto"),
+            )
+
+        def on_back() -> None:
+            self._append_log("Returning to launcher.")
+
+        self._append_log("Opening Analysis Configuration...")
+        config = AnalysisConfiguration(
+            on_run_analysis=on_run_analysis,
+            on_back=on_back,
+            theme=self.theme_name,
+        )
+        config.run()
+
+    def _open_comparison(self) -> None:
+        """Open the comparison view screen."""
+        try:
+            from .ui.comparison_view import ComparisonView
+        except ImportError as exc:
+            self.messagebox.showerror("Import Error", f"Failed to import ComparisonView: {exc}")
+            return
+
+        def on_export() -> None:
+            self.messagebox.showinfo(
+                "Comparison Report",
+                "Generating comparison report...\n\nThis will create a side-by-side "
+                "report with all metric deltas and improvement suggestions.",
+            )
+
+        def on_back() -> None:
+            self._append_log("Returning to launcher.")
+
+        self._append_log("Opening Comparison Mode...")
+        comparison = ComparisonView(
+            on_export=on_export,
+            on_back=on_back,
+            theme=self.theme_name,
+        )
+        comparison.run()
+
+    def _open_settings(self) -> None:
+        self.messagebox.showinfo(
+            "Settings",
+            "Settings panel coming soon.\n\n"
+            "Available settings:\n"
+            "- Theme (light/dark)\n"
+            "- Default preset profile\n"
+            "- Output directory\n"
+            "- Pose model selection\n"
+            "- Language / i18n",
+        )
+
+    def _run_analysis(
+        self,
+        video_path: Path | None = None,
+        pose_model: str = "yolo11n-pose.pt",
+        sensitivity: float = 0.7,
+        auto_pause: bool = True,
+        reference: str = "default_reference.json",
+        output_format: str = "pdf",
+        device: str = "auto",
+    ) -> None:
+        """Run the analysis pipeline."""
+        if video_path is None:
+            video_path = pick_video()
+        if video_path is None:
             self.messagebox.showerror("Missing Video", "Select a snatch attempt video first.")
             return
-        video_path = Path(video_text)
         if not video_path.exists():
             self.messagebox.showerror("Video Not Found", f"Could not find:\n{video_path}")
             return
 
-        self._run_task(
-            title="Tracking bar path...",
-            task=self._analyze_task,
-            kwargs={
-                "video_path": video_path,
-                "auto_pause": True,
-                "pause_mode": "after-recovery-stable",
-                "model": _model_for_backend(self.model_var.get()),
-                "device": _preferred_device(),
-            },
-        )
+        self._append_log(f"Starting analysis: {video_path.name}")
+
+        def _run() -> None:
+            try:
+                AnalyzerConfig, SnatchAnalysisSession = _load_analysis_symbols()
+                session = SnatchAnalysisSession(
+                    AnalyzerConfig(
+                        video_path=video_path,
+                        pose_backend_name="yolo",
+                        model_name=_model_for_backend(pose_model),
+                        device=_preferred_device() if device == "auto" else device,
+                        reference_path=None,
+                        auto_pause=auto_pause,
+                        pause_mode="after-recovery-stable",
+                        interactive=True,
+                        show_live_window=True,
+                        persist_outputs=True,
+                    )
+                )
+                summary = session.run()
+                self.events.put(("success", {"kind": "analysis", "output_dir": str(session.output_dir), "summary": summary}))
+            except Exception as exc:
+                self.events.put(("error", str(exc)))
+
+        self.worker = threading.Thread(target=_run, daemon=True)
+        self.worker.start()
 
     def _run_task(self, title: str, task, kwargs: dict, on_success=None) -> None:
         if self.worker is not None and self.worker.is_alive():
@@ -377,36 +512,6 @@ class SnatchLauncher:
         except queue.Empty:
             pass
         self.root.after(150, self._poll_worker)
-
-    def _analyze_task(
-        self,
-        video_path: Path,
-        auto_pause: bool,
-        pause_mode: str,
-        model: str,
-        device: str,
-    ) -> dict[str, Any]:
-        AnalyzerConfig, SnatchAnalysisSession = _load_analysis_symbols()
-        session = SnatchAnalysisSession(
-            AnalyzerConfig(
-                video_path=video_path,
-                pose_backend_name="yolo",
-                model_name=model,
-                device=device,
-                reference_path=None,
-                auto_pause=auto_pause,
-                pause_mode=pause_mode,
-                interactive=True,
-                show_live_window=True,
-                persist_outputs=True,
-            )
-        )
-        summary = session.run()
-        return {
-            "kind": "analysis",
-            "output_dir": str(session.output_dir),
-            "summary": summary,
-        }
 
     def _handle_success_payload(self, payload: dict[str, Any]) -> str:
         kind = payload.get("kind")
@@ -459,6 +564,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.mode == "launch":
             launcher = SnatchLauncher(
                 model=args.model,
+                theme=args.theme,
             )
             return launcher.run()
 
